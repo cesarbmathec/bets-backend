@@ -182,4 +182,13 @@ go test ./tests/... -v -run TestLogin
 
 ## Licencia
 
-MIT License
+MIT License - Desarrollado por César Bustamante
+
+## Contacto
+
+Puedes contactarme a través de los siguientes medios:
+prodeprogramacion@gmail.com o cesarbmath@gmail.com
+
+## Donaciones
+
+Binance: cesarbmath@gmail.com
