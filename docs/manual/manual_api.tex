@@ -1,0 +1,1445 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+
+% Configuración de colores para código
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+	backgroundcolor=\color{backcolour},   
+	commentstyle=\color{codegreen},
+	keywordstyle=\color{blue},
+	numberstyle=\tiny\color{codegray},
+	stringstyle=\color{codepurple},
+	basicstyle=\ttfamily\footnotesize,
+	breakatwhitespace=false,         
+	breaklines=true,                 
+	captionpos=b,                    
+	keepspaces=true,                 
+	numbers=left,                    
+	numbersep=5pt,                  
+	showspaces=false,                
+	showstringspaces=false,
+	showtabs=false,                  
+	tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{Manual de Usuario - Sistema de Torneos y Apuestas}
+\author{Backend API v1.0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introducción}
+Este documento describe el uso completo del sistema de backend para torneos y apuestas. 
+El sistema permite gestionar torneos deportivos con sesiones diarias, donde los participantes 
+realizan selecciones (macho, hembra, alta, baja, runline) y acumulan puntos.
+
+\subsection{Flujo General del Sistema}
+El flujo del programa es el siguiente:
+
+\begin{enumerate}
+    \item \textbf{Registro del Administrador}: El admin se registra en el sistema
+    \item \textbf{Creación del Tournament}: El admin define el tournament con sus reglas
+    \item \textbf{Creación de Sesiones}: Se crean las jornadas/días del tournament
+    \item \textbf{Creación de Eventos}: Se definen los partidos/carreras por sesión
+    \item \textbf{Configuración de Selecciones}: El admin define las opciones de apuesta
+    \item \textbf{Registro de Usuarios}: Los clientes se registran y recargan saldo
+    \item \textbf{Inscripción al Tournament}: Los usuarios se unen al tournament
+    \item \textbf{Envío de Predicciones}: Los participantes hacen sus selecciones por sesión
+    \item \textbf{Liquidación de Eventos}: El admin establece los resultados
+    \item \textbf{Distribución de Premios}: Se reparten los premios a los ganadores
+\end{enumerate}
+
+\subsection{Roles del Sistema}
+El sistema cuenta con dos roles:
+
+\begin{itemize}
+    \item \textbf{admin}: Acceso completo a todas las funciones de gestión del sistema
+    \item \textbf{user}: Usuario regular, puede participar en tournaments y gestionar su wallet
+\end{itemize}
+
+\subsection{Usuario Administrador Inicial}
+Al ejecutar la aplicación por primera vez, se crea automáticamente un usuario administrador:
+
+\begin{itemize}
+    \item \textbf{Email}: admin@betsystem.com
+    \item \textbf{Password}: Admin123!
+\end{itemize}
+
+\subsection{Formato de Respuestas}
+Todas las respuestas siguen el siguiente formato:
+
+\textbf{Respuesta Exitosa:}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Mensaje descriptivo",
+    "data": { ... }
+}
+\end{lstlisting}
+
+\textbf{Respuesta de Error:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Mensaje de error",
+    "errors": "Detalle del error o null"
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Autenticación}
+
+\subsection{Registro de Usuario}
+Registra un nuevo usuario en el sistema.
+
+\textbf{Endpoint:} \texttt{POST /api/v1/auth/register}
+
+\begin{lstlisting}[language=c]
+{
+    "username": "jugador1",
+    "email": "jugador1@example.com",
+    "password": "SecurePass123"
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Usuario registrado exitosamente",
+    "data": {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "user": "jugador1"
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Datos inválidos:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Error de validación",
+    "errors": "Key: 'RegisterRequest.Email' Error:Field validation for 'Email' failed on the 'required' tag"
+}
+\end{lstlisting}
+
+\textbf{Error 409 - Usuario ya existe:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "El usuario o email ya existe",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Inicio de Sesión}
+Autentica a un usuario y devuelve un token JWT.
+
+\textbf{Endpoint:} \texttt{POST /api/v1/auth/login}
+
+\begin{lstlisting}[language=c]
+{
+    "email": "admin@betsystem.com",
+    "password": "Admin123!"
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Bienvenido al sistema",
+    "data": {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "user": {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@betsystem.com",
+            "role": "admin"
+        }
+    }
+}
+\end{lstlisting}
+
+\textit{Nota: El token devuelto debe usarse en el header \texttt{Authorization: Bearer <token>} para las rutas protegidas.}
+
+\textbf{Error 400 - Datos inválidos:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos de entrada inválidos",
+    "errors": "Key: 'LoginRequest.Email' Error:Field validation for 'Email' failed on the 'email' tag"
+}
+\end{lstlisting}
+
+\textbf{Error 401 - Credenciales incorrectas:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Credenciales incorrectas",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 403 - Cuenta desactivada:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Cuenta de usuario desactivada",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Ver Mi Perfil}
+Obtiene los datos del usuario autenticado.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/me} (Protegido)
+
+\textbf{Headers:} \texttt{Authorization: Bearer <token>}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Perfil del usuario",
+    "data": {
+        "id": 1,
+        "username": "jugador1",
+        "email": "jugador1@example.com",
+        "role": "user",
+        "is_active": true
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 401 - No autorizado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Se requiere token de autorización",
+    "errors": null
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Gestión de Torneos}
+
+\subsection{Crear un Tournament}
+Crea un nuevo tournament con configuración de sesiones y selecciones. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{POST /api/v1/admin/tournaments}
+
+\textbf{Headers:} \texttt{Authorization: Bearer <token>}
+
+\begin{lstlisting}[language=c]
+{
+    "name": "Quiniela Liga BBVA 2026",
+    "description": "Torneo de pronosticos de la liga espa\u00f1ola",
+    "category": "Futbol",
+    "start_date": "2026-02-23T00:00:00Z",
+    "end_date": "2026-03-01T23:59:59Z",
+    "entry_fee": 10.00,
+    "entry_fee_tokens": 0,
+    "prize_bonus": 10.00,
+    "admin_fee_percent": 10.0,
+    "settings": {
+        "prize_distribution": [0.70, 0.20, 0.10],
+        "selections_per_session": 5,
+        "required_selection_types": ["macho", "hembra", "alta", "baja", "runline"],
+        "total_sessions": 5,
+        "horse_racing_points": []
+    }
+}
+\end{lstlisting}
+
+\textbf{Explicación de Settings:}
+\begin{itemize}
+    \item \texttt{prize\_distribution}: Porcentaje para 1ro (70\%), 2do (20\%), 3er (10\%)
+    \item \texttt{selections\_per\_session}: Cantidad de selecciones por día/sesión
+    \item \texttt{required\_selection\_types}: Tipos obligatorios en orden [macho, hembra, alta, baja, runline]
+    \item \texttt{total\_sessions}: Cantidad total de jornadas/días del tournament
+    \item \texttt{horse\_racing\_points}: Solo para hipica [puntos\_1ro, puntos\_2do, puntos\_3er]
+\end{itemize}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Torneo creado con exito",
+    "data": {
+        "id": 1,
+        "name": "Quiniela Liga BBVA 2026",
+        "slug": "quiniela-liga-bbva-2026",
+        "status": "open",
+        "entry_fee": 10.00,
+        "prize_pool": 0,
+        "settings": {
+            "prize_distribution": [0.7, 0.2, 0.1],
+            "selections_per_session": 5,
+            "required_selection_types": ["macho", "hembra", "alta", "baja", "runline"],
+            "total_sessions": 5
+        }
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Datos inválidos:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'CreateTournamentRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag"
+}
+\end{lstlisting}
+
+\textbf{Error 401 - No autorizado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Se requiere token de autorización",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 403 - No es admin:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Acceso denegado. Se requiere rol de administrador",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Listar Torneos}
+Obtiene todos los torneos disponibles.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/tournaments}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Lista de torneos",
+    "data": [
+        {
+            "id": 1,
+            "name": "Quiniela Liga BBVA 2026",
+            "category": "Futbol",
+            "status": "open",
+            "entry_fee": 10.00
+        }
+    ]
+}
+\end{lstlisting}
+
+\subsection{Ver Detalle de un Tournament}
+Obtiene los detalles completos de un tournament.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/tournaments/id/1}
+
+\textbf{Error 404 - Tournament no encontrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Torneo no encontrado por ID",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Ver Leaderboard}
+Obtiene la tabla de clasificación del tournament.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/tournaments/id/1/leaderboard}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Tabla de clasificacion",
+    "data": [
+        {
+            "id": 1,
+            "user_id": 5,
+            "user": {
+                "username": "jugador1"
+            },
+            "total_points": 45,
+            "tournament_id": 1
+        }
+    ]
+}
+\end{lstlisting}
+
+\subsection{Actualizar Estado del Tournament}
+Finaliza el tournament y distribuye los premios. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{PATCH /api/v1/admin/tournaments/1/status}
+
+\begin{lstlisting}[language=c]
+{
+    "status": "finished"
+}
+\end{lstlisting}
+
+\textit{Nota: Al cambiar a "finished", el sistema automáticamente calcula los ganadores y distribuye los premios según prize\_distribution.}
+
+\textbf{Estados válidos:} open, closed, finished
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Estado actualizado y premios procesados (si aplica)",
+    "data": {
+        "id": 1,
+        "status": "finished",
+        "prize_pool": 100.00,
+        "prize_bonus": 10.00
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Estado inválido:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'UpdateStatusRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"
+}
+\end{lstlisting}
+
+\textbf{Error 404 - Tournament no encontrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Torneo no encontrado",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 403 - No es admin:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Acceso denegado. Se requiere rol de administrador",
+    "errors": null
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Gestión de Sesiones}
+
+\subsection{Crear una Sesión}
+Crea una jornada/día dentro de un tournament. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{POST /api/v1/admin/sessions}
+
+\begin{lstlisting}[language=c]
+{
+    "tournament_id": 1,
+    "session_number": 1,
+    "start_time": "2026-02-23T00:00:00Z",
+    "end_time": "2026-02-23T18:00:00Z",
+    "description": "Jornada 1 - Lunes"
+}
+\end{lstlisting}
+
+\textbf{Explicación:}
+\begin{itemize}
+    \item \texttt{session\_number}: 1 = Lunes, 2 = Martes, etc.
+    \item \texttt{start\_time}: Cuándo abre la sesión para hacer selecciones
+    \item \texttt{end\_time}: Hora límite (antes de que inicien los partidos)
+\end{itemize}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Sesion creada correctamente",
+    "data": {
+        "id": 1,
+        "tournament_id": 1,
+        "session_number": 1,
+        "start_time": "2026-02-23T00:00:00Z",
+        "end_time": "2026-02-23T18:00:00Z",
+        "status": "open"
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Datos inválidos:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'CreateSessionRequest.SessionNumber' Error:Field validation for 'SessionNumber' failed on the 'min' tag"
+}
+\end{lstlisting}
+
+\textbf{Error 404 - Tournament no encontrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Torneo no encontrado",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 409 - Sesión ya existe:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Ya existe la sesión #1 para este torneo",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Listar Sesiones de un Tournament}
+Obtiene todas las sesiones de un tournament.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/tournaments/1/sessions}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Sesiones del torneo",
+    "data": [
+        {
+            "id": 1,
+            "session_number": 1,
+            "start_time": "2026-02-23T00:00:00Z",
+            "end_time": "2026-02-23T18:00:00Z",
+            "status": "open"
+        }
+    ]
+}
+\end{lstlisting}
+
+\subsection{Ver Detalle de Sesión}
+Obtiene los eventos y selecciones de una sesión.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/session-events/1}
+
+\textbf{Error 404 - Sesión no encontrada:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Sesión no encontrada",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Cerrar una Sesión}
+Cierra una sesión para que no se puedan hacer más predicciones. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{PATCH /api/v1/admin/sessions/1/status}
+
+\begin{lstlisting}[language=c]
+{
+    "status": "closed"
+}
+\end{lstlisting}
+
+\textbf{Estados válidos:} open, closed, settled
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Estado de sesión actualizado",
+    "data": {
+        "id": 1,
+        "status": "closed"
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Estado inválido:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'UpdateSessionStatusRequest.Status' Error:Field validation for 'Status' failed on the 'oneof' tag"
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Gestión de Eventos}
+
+\subsection{Crear un Evento}
+Crea un partido/carrera dentro de una sesión. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{POST /api/v1/admin/events}
+
+\begin{lstlisting}[language=c]
+{
+    "tournament_id": 1,
+    "session_id": 1,
+    "name": "Real Madrid vs Barcelona",
+    "order": 1,
+    "start_time": "2026-02-23T19:00:00Z"
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Evento creado con exito",
+    "data": {
+        "id": 1,
+        "tournament_id": 1,
+        "session_id": 1,
+        "name": "Real Madrid vs Barcelona",
+        "start_time": "2026-02-23T19:00:00Z",
+        "status": "scheduled"
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Datos inválidos:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'CreateEventRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag"
+}
+\end{lstlisting}
+
+\subsection{Asignar Competidores}
+Asocia equipos/caballos a un evento. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{POST /api/v1/admin/events/id/1/competitors}
+
+\begin{lstlisting}[language=c]
+{
+    "competitors": [
+        {"name": "Real Madrid", "assigned_number": 1},
+        {"name": "Barcelona", "assigned_number": 2}
+    ]
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Competidores asignados correctamente",
+    "data": null
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Datos inválidos:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos de competidores inválidos",
+    "errors": "Key: 'SetCompetitorsRequest.Competitors' Error:Field validation for 'Competitors' failed on the 'min' tag"
+}
+\end{lstlisting}
+
+\subsection{Ver Eventos del Tournament}
+Obtiene todos los eventos con sus selecciones disponibles.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/tournaments/1/events}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Eventos y selecciones del torneo",
+    "data": [
+        {
+            "id": 1,
+            "name": "Real Madrid vs Barcelona",
+            "start_time": "2026-02-23T19:00:00Z",
+            "competitors": [...],
+            "pickable_selections": [...]
+        }
+    ]
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Gestión de Selecciones}
+
+\subsection{Crear una Selección}
+Crea una opción de apuesta para un evento. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{POST /api/v1/admin/events/selections}
+
+Ejemplo - Macho (Favorito):
+\begin{lstlisting}[language=c]
+{
+    "event_id": 1,
+    "description": "Gana Real Madrid",
+    "selection_type": "macho",
+    "odds": -120,
+    "competitor_id": 1,
+    "points_for_win": 10
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Seleccion creada correctamente",
+    "data": {
+        "id": 1,
+        "event_id": 1,
+        "description": "Gana Real Madrid",
+        "selection_type": "macho",
+        "odds": -120,
+        "points_for_win": 10,
+        "status": "pending"
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Datos inválidos:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'CreateSelectionRequest.Description' Error:Field validation for 'Description' failed on the 'required' tag"
+}
+\end{lstlisting}
+
+\textbf{Error 404 - Evento no encontrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "El evento no existe",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Ver Selecciones de un Evento}
+Obtiene todas las opciones de apuesta de un evento.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/events/id/1/selections}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Opciones disponibles",
+    "data": [
+        {
+            "id": 1,
+            "description": "Gana Real Madrid",
+            "selection_type": "macho",
+            "points_for_win": 10
+        }
+    ]
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Gestión de Billeteras}
+
+\subsection{Recargar Saldo}
+Permite a un usuario depositar dinero en su wallet.
+
+\textbf{Endpoint:} \texttt{POST /api/v1/wallet/deposit} (Protegido)
+
+\begin{lstlisting}[language=c]
+{
+    "amount": 100.00,
+    "method": "pago_movil",
+    "reference_number": "PM123456",
+    "bank_name": "Banco de Venezuela"
+}
+\end{lstlisting}
+
+\textit{Métodos disponibles: "pago\_movil", "zelle", "binance", "transferencia", "paypal"}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Deposito realizado con exito",
+    "data": {
+        "id": 1,
+        "user_id": 5,
+        "amount": 100.00,
+        "type": "in",
+        "method": "pago_movil",
+        "status": "pending"
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Monto inválido:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'DepositRequest.Amount' Error:Field validation for 'Amount' failed on the 'gt' tag"
+}
+\end{lstlisting}
+
+\subsection{Consultar Saldo}
+Obtiene el balance actual del usuario.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/wallet/balance} (Protegido)
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Balance consultado",
+    "data": {
+        "user_id": 5,
+        "balance": 90.00,
+        "frozen_balance": 0,
+        "bonus_balance": 0,
+        "token_balance": 0,
+        "currency": "USD"
+    }
+}
+\end{lstlisting}
+
+\subsection{Historial de Transacciones}
+Obtiene el historial de transacciones del usuario.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/wallet/history} (Protegido)
+
+\subsection{Estadísticas del Usuario}
+Obtiene estadísticas de participación del usuario.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/wallet/statistics} (Protegido)
+
+\newpage
+
+\section{Participación en Torneos}
+
+\subsection{Inscribirse en un Tournament}
+Un usuario se une a un tournament pagando la inscripción.
+
+\textbf{Endpoint:} \texttt{POST /api/v1/tournaments/1/join} (Protegido)
+
+\begin{lstlisting}[language=c]
+{
+    "pay_with_tokens": false
+}
+\end{lstlisting}
+
+\textit{Nota: \texttt{pay\_with\_tokens: true} si desea pagar con tokens en lugar de dinero real.}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Inscripcion exitosa",
+    "data": {
+        "id": 1,
+        "user_id": 5,
+        "tournament_id": 1,
+        "total_points": 0
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 403 - No inscrito en el tournament:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "No estás inscrito en este torneo",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Tournament cerrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "El torneo no está abierto para inscripciones",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Saldo insuficiente:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Saldo insuficiente",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 409 - Ya inscrito:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Ya estás inscrito en este torneo",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Enviar Predicciones (Por Sesión)}
+El participante envía sus selecciones para una sesión específica.
+
+\textbf{Endpoint:} \texttt{POST /api/v1/tournaments/1/sessions/picks} (Protegido)
+
+\begin{lstlisting}[language=c]
+{
+    "session_id": 1,
+    "selection_ids": [1, 2, 3, 4, 5]
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (201):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Predicciones guardadas para la sesion",
+    "data": [
+        {
+            "id": 1,
+            "participant_id": 1,
+            "selection_id": 1,
+            "session_id": 1,
+            "status": "pending",
+            "awarded_points": 0
+        }
+    ]
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Cantidad incorrecta de selecciones:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Debe hacer exactamente 5 selecciones por sesión",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Sesión cerrada:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "La sesión no está abierta para predicciones",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Hora límite excedida:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Ya cerró la hora límite para hacer selecciones en esta sesión",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Tipo de selección incorrecto:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "La selección #1 debe ser de tipo 'macho' (posición 1)",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 403 - No inscrito:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "No estás inscrito en este torneo",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Ver Mis Predicciones de una Sesión}
+El usuario puede ver sus predicciones enviadas.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/my-sessions/1/picks} (Protegido)
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Tus predicciones en esta sesion",
+    "data": [
+        {
+            "id": 1,
+            "selection_id": 1,
+            "session_id": 1,
+            "status": "won",
+            "awarded_points": 10,
+            "selection": {
+                "description": "Gana Real Madrid",
+                "selection_type": "macho"
+            }
+        }
+    ]
+}
+\end{lstlisting}
+
+\subsection{Ver Eventos del Tournament}
+El usuario ve la cartelera completa para hacer sus picks.
+
+\textbf{Endpoint:} \texttt{GET /api/v1/tournaments/1/events}
+
+\newpage
+
+\section{Liquidación de Eventos}
+
+\subsection{Establecer Resultados}
+El admin establece los resultados de un evento. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{POST /api/v1/admin/events/id/1/settle}
+
+Para deportes de equipo:
+\begin{lstlisting}[language=c]
+{
+    "results": [
+        {"competitor_id": 1, "final_score": 3, "position": 0},
+        {"competitor_id": 2, "final_score": 1, "position": 0}
+    ]
+}
+\end{lstlisting}
+
+Para carreras de caballos:
+\begin{lstlisting}[language=c]
+{
+    "results": [
+        {"competitor_id": 1, "final_score": 0, "position": 1},
+        {"competitor_id": 2, "final_score": 0, "position": 2},
+        {"competitor_id": 3, "final_score": 0, "position": 3}
+    ]
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Evento liquidado y puntos asignados correctamente",
+    "data": null
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Evento ya liquidado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Este evento ya ha sido liquidado",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 404 - Evento no encontrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Evento no encontrado",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Finalizar Tournament y Pagar Premios}
+El admin termina el tournament y se distribuyen los premios.
+
+\textbf{Endpoint:} \texttt{PATCH /api/v1/admin/tournaments/1/status}
+
+\begin{lstlisting}[language=c]
+{
+    "status": "finished"
+}
+\end{lstlisting}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Estado actualizado y premios procesados (si aplica)",
+    "data": {
+        "id": 1,
+        "status": "finished",
+        "prize_pool": 100.00,
+        "prize_bonus": 10.00
+    }
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Gestión de Usuarios (Admin)}
+
+\subsection{Listar Usuarios}
+Obtiene todos los usuarios del sistema. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{GET /api/v1/admin/users}
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Lista de usuarios",
+    "data": [
+        {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@betsystem.com",
+            "role": "admin",
+            "is_active": true
+        }
+    ]
+}
+\end{lstlisting}
+
+\textbf{Error 403 - No es admin:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Acceso denegado. Se requiere rol de administrador",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Ver Usuario por ID}
+Obtiene los detalles de un usuario específico. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{GET /api/v1/admin/users/1}
+
+\textbf{Error 404 - Usuario no encontrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Usuario no encontrado",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Actualizar Rol de Usuario}
+Cambia el rol de un usuario. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{PATCH /api/v1/admin/users/1/role}
+
+\begin{lstlisting}[language=c]
+{
+    "role": "admin"
+}
+\end{lstlisting}
+
+\textbf{Roles válidos:} user, admin
+
+\textbf{Respuesta exitosa (200):}
+\begin{lstlisting}[language=c]
+{
+    "success": true,
+    "message": "Rol actualizado correctamente",
+    "data": {
+        "id": 2,
+        "username": "jugador1",
+        "role": "admin"
+    }
+}
+\end{lstlisting}
+
+\textbf{Error 400 - Rol inválido:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Datos inválidos",
+    "errors": "Key: 'UpdateUserRoleRequest.Role' Error:Field validation for 'Role' failed on the 'oneof' tag"
+}
+\end{lstlisting}
+
+\textbf{Error 404 - Usuario no encontrado:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "Usuario no encontrado",
+    "errors": null
+}
+\end{lstlisting}
+
+\textbf{Error 403 - No puede degradarse a sí mismo:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "No puede degradar su propio rol de administrador",
+    "errors": null
+}
+\end{lstlisting}
+
+\subsection{Actualizar Estado de Usuario}
+Activa o desactiva un usuario. \textbf{(Solo Admin)}
+
+\textbf{Endpoint:} \texttt{PATCH /api/v1/admin/users/1/status}
+
+\begin{lstlisting}[language=c]
+{
+    "is_active": false
+}
+\end{lstlisting}
+
+\textbf{Error 403 - No puede desactivarse a sí mismo:}
+\begin{lstlisting}[language=c]
+{
+    "success": false,
+    "message": "No puede desactivarse a sí mismo",
+    "errors": null
+}
+\end{lstlisting}
+
+\newpage
+
+\section{Códigos de Estado HTTP}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|l|}
+\hline
+\textbf{Código} & \textbf{Estado} & \textbf{Descripción} \\ \hline
+200 & OK & La solicitud fue exitosa \\ \hline
+201 & Created & Recurso creado exitosamente \\ \hline
+400 & Bad Request & Datos inválidos o mal formados \\ \hline
+401 & Unauthorized & Token no proporcionado o inválido \\ \hline
+403 & Forbidden & No tiene permisos para esta acción \\ \hline
+404 & Not Found & Recurso no encontrado \\ \hline
+409 & Conflict & Conflicto (ej: ya inscrito) \\ \hline
+500 & Internal Server Error & Error del servidor \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Endpoints Resumen}
+
+\subsection{Rutas Públicas}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Endpoint} & \textbf{Descripción} \\ \hline
+POST /api/v1/auth/register & Registrar usuario \\ \hline
+POST /api/v1/auth/login & Iniciar sesión \\ \hline
+GET /api/v1/tournaments & Listar torneos \\ \hline
+GET /api/v1/tournaments/id/:id & Ver torneo \\ \hline
+GET /api/v1/tournaments/s/:slug & Ver torneo por slug \\ \hline
+GET /api/v1/tournaments/id/:id/leaderboard & Leaderboard \\ \hline
+GET /api/v1/tournaments/id/:id/events & Eventos del torneo \\ \hline
+GET /api/v1/tournaments/id/:id/sessions & Sesiones del torneo \\ \hline
+GET /api/v1/session-events/:id & Detalle de sesión \\ \hline
+GET /api/v1/events/id/:id & Ver evento \\ \hline
+GET /api/v1/events/s/:slug & Ver evento por slug \\ \hline
+GET /api/v1/events/id/:id/selections & Selecciones del evento \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Rutas de Usuario (Requiere Auth)}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Endpoint} & \textbf{Descripción} \\ \hline
+GET /api/v1/me & Mi perfil \\ \hline
+POST /api/v1/tournaments/:id/join & Inscribirse a un torneo \\ \hline
+POST /api/v1/tournaments/:id/sessions/picks & Enviar pronósticos \\ \hline
+GET /api/v1/my-sessions/:session\_id/picks & Ver mis pronósticos \\ \hline
+GET /api/v1/wallet/balance & Consultar saldo \\ \hline
+POST /api/v1/wallet/deposit & Recargar saldo \\ \hline
+GET /api/v1/wallet/history & Historial transacciones \\ \hline
+GET /api/v1/wallet/statistics & Estadísticas usuario \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Rutas de Administrador (Requiere Auth + Rol Admin)}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Endpoint} & \textbf{Descripción} \\ \hline
+GET /api/v1/admin/users/ & Listar usuarios \\ \hline
+GET /api/v1/admin/users/:id & Detalle de usuario \\ \hline
+PATCH /api/v1/admin/users/:id/role & Cambiar rol \\ \hline
+PATCH /api/v1/admin/users/:id/status & Banear/Activar \\ \hline
+POST /api/v1/admin/tournaments/ & Crear torneo \\ \hline
+PATCH /api/v1/admin/tournaments/:id/status & Estado del torneo \\ \hline
+POST /api/v1/admin/sessions/ & Crear sesión \\ \hline
+PATCH /api/v1/admin/sessions/:id/status & Estado de la sesión \\ \hline
+POST /api/v1/admin/events/ & Crear evento \\ \hline
+POST /api/v1/admin/events/selections & Crear selección \\ \hline
+POST /api/v1/admin/events/:id/competitors & Competidores \\ \hline
+POST /api/v1/admin/events/:id/settle & Liquidar evento \\ \hline
+\end{tabular}
+\end{table}
+
+
+
+\section{Pruebas del Sistema}
+\label{sec:pruebas}
+
+El proyecto incluye un conjunto de pruebas automatizadas que verifican el correcto funcionamiento del backend. Las pruebas utilizan una base de datos SQLite en memoria para ejecutar tests sin modificar la base de datos de producción.
+
+\subsection{Ejecutar las Pruebas}
+
+Para ejecutar todas las pruebas del proyecto:
+
+\begin{verbatim}
+# Ejecutar todas las pruebas
+go test ./tests/... -v
+
+# Ejecutar solo pruebas de autenticación
+go test ./tests/... -v -run TestRegister
+
+# Ejecutar solo pruebas de autenticación de login
+go test ./tests/... -v -run TestLogin
+\end{verbatim}
+
+\subsection{Tests de Autenticación}
+
+Los tests de autenticación verifican los siguientes escenarios:
+
+\begin{enumerate}
+  \item \textbf{Registro de Usuario}
+  \begin{itemize}
+    \item Registro exitoso con datos válidos
+    \item Registro con email ya existente
+    \item Registro con username duplicado
+    \item Registro con email inválido
+    \item Registro con contraseña muy corta
+  \end{itemize}
+  
+  \item \textbf{Inicio de Sesión}
+  \begin{itemize}
+    \item Login con credenciales correctas
+    \item Login con contraseña incorrecta
+    \item Login con usuario inexistente
+  \end{itemize}
+  
+  \item \textbf{Protección de Rutas}
+  \begin{itemize}
+    \item Rutas públicas accesibles sin autenticación
+    \item Rutas protegidas requieren token JWT
+    \item Rutas de admin requieren rol de administrador
+  \end{itemize}
+\end{enumerate}
+
+\subsection{Resultado Esperado}
+
+Al ejecutar las pruebas, debería ver una salida similar a:
+
+\begin{verbatim}
+=== RUN   TestRegister_Success
+--- PASS: TestRegister_Success (1.08s)
+=== RUN   TestRegister_EmailAlreadyExists
+--- PASS: TestRegister_EmailAlreadyExists (2.15s)
+=== RUN   TestLogin_Success
+--- PASS: TestLogin_Success (2.23s)
+=== RUN   TestLogin_InvalidCredentials
+--- PASS: TestLogin_InvalidCredentials (2.15s)
+=== RUN   TestPublicRoutes_Accessible
+--- PASS: TestPublicRoutes_Accessible (0.01s)
+=== RUN   TestProtectedRoutes_RequireAuth
+--- PASS: TestProtectedRoutes_RequireAuth (0.01s)
+=== RUN   TestRegister_InvalidEmail
+--- PASS: TestRegister_InvalidEmail (0.00s)
+=== RUN   TestRegister_ShortPassword
+--- PASS: TestRegister_ShortPassword (0.01s)
+=== RUN   TestRegister_DuplicateUsername
+--- PASS: TestRegister_DuplicateUsername (2.23s)
+=== RUN   TestLogin_NonExistentUser
+--- PASS: TestLogin_NonExistentUser (0.01s)
+=== RUN   TestAdminRoutes_RequireAdmin
+--- PASS: TestAdminRoutes_RequireAdmin (1.09s)
+PASS
+ok  	github.com/cesarbmathec/bets-backend/tests	11.348s
+\end{verbatim}
+
+\subsection{Agregar Nuevas Pruebas}
+
+Para agregar nuevas pruebas, cree archivos en el directorio \texttt{tests/} con el sufijo \texttt{\_test.go}. El archivo \texttt{tests/helpers\_test.go} contiene funciones helper para configurar la base de datos de pruebas y hacer requests HTTP.
+
+\begin{verbatim}
+package tests
+
+import (
+    "testing"
+    "github.com/cesarbmathec/bets-backend/config"
+    "github.com/cesarbmathec/bets-backend/models"
+)
+
+func TestNuevoEscenario(t *testing.T) {
+    // Setup - crear base de datos en memoria
+    SetupTestDB(t)
+    router := SetupRouter()
+    
+    // Arrange - preparar datos de prueba
+    
+    // Act - ejecutar la operación
+    w := MakeJSONRequest(router, "POST", "/api/v1/endpoint", data)
+    
+    // Assert - verificar resultados
+    assert.Equal(t, http.StatusOK, w.Code)
+}
+\end{verbatim}
+
+\section{Nuevas Funcionalidades}
+\label{sec:nuevas-funcionalidades}
+
+\subsection{Login con Email o Username}
+El sistema permite autenticarse usando email O username:
+
+\begin{verbatim}
+{"email": "user@example.com", "password": "password123"}
+{"username": "user1", "password": "password123"}
+\end{verbatim}
+
+\subsection{Campo Nickname}
+El modelo de usuario incluye un campo \texttt{nickname} que se muestra en las tablas y leaderboards del frontend.
+
+\subsection{Metodos de Pago/Retiro}
+El sistema permite registrar multiples metodos de pago para retiros:
+\begin{itemize}
+  \item Pago Movil (telefono, banco, cuenta)
+  \item Zelle (email, nombre)
+  \item Binance/USDT (direccion, red, email)
+  \item PayPal (email)
+  \item Transferencia Bancaria (numero de cuenta, CLABE, SWIFT)
+\end{itemize}
+
+\subsection{Rutas de Metodos de Pago}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Endpoint} & \textbf{Descripcion} \\ \hline
+GET /api/v1/payment-methods & Listar metodos de pago \\ \hline
+POST /api/v1/payment-methods & Agregar metodo de pago \\ \hline
+DELETE /api/v1/payment-methods/:id & Eliminar metodo de pago \\ \hline
+\end{tabular}
+\end{table}
+
+\end{document}

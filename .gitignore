@@ -1,0 +1,51 @@
+# Binarios compilados
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Archivos de test
+*.test
+
+# Output de la herramienta
+output/
+
+# Configuración local
+.env
+.env.local
+.env.*.local
+
+# Dependencias de Go
+vendor/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Documentación generada
+docs/swagger.json
+docs/swagger.yaml
+docs/docs.go
+
+# Builds de LaTeX
+docs/manual/*.aux
+docs/manual/*.log
+docs/manual/*.out
+docs/manual/*.synctex.gz
+docs/manual/*.toc
+
+# Temporal
+tmp/
+temp/
