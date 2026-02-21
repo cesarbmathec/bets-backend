@@ -82,7 +82,6 @@ Swagger UI disponible en: `http://localhost:8080/swagger/index.html`
 
 ```
 bets-backend/
-├── cmd/                    # Punto de entrada
 ├── config/                 # Configuración de base de datos
 ├── controllers/             # Controladores de la API
 ├── docs/                   # Documentación Swagger
