@@ -10,6 +10,7 @@ type UserPaymentMethod struct {
 
 	// Datos de Pago Móvil
 	PhoneNumber string `gorm:"size:20" json:"phone_number,omitempty"`
+	Cedula      string `gorm:"size:20" json:"cedula,omitempty"`
 	BankName    string `gorm:"size:100" json:"bank_name,omitempty"`
 	BankAccount string `gorm:"size:50" json:"bank_account,omitempty"`
 

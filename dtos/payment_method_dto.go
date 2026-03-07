@@ -6,6 +6,7 @@ type UserPaymentMethodRequest struct {
 
 	// Datos de Pago Móvil
 	PhoneNumber string `json:"phone_number,omitempty"`
+	Cedula      string `json:"cedula,omitempty"`
 	BankName    string `json:"bank_name,omitempty"`
 	BankAccount string `json:"bank_account,omitempty"`
 
@@ -37,6 +38,7 @@ type UserPaymentMethodResponse struct {
 	IsDefault     bool   `json:"is_default"`
 	IsVerified    bool   `json:"is_verified"`
 	PhoneNumber   string `json:"phone_number,omitempty"`
+	Cedula        string `json:"cedula,omitempty"`
 	BankName      string `json:"bank_name,omitempty"`
 	ZelleEmail    string `json:"zelle_email,omitempty"`
 	ZelleName     string `json:"zelle_name,omitempty"`

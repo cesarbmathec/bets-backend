@@ -43,18 +43,23 @@ func SubmitPicks(c *gin.Context) {
 	}
 
 	var savedPicks []models.UserPick
+	var err error
 
 	// 2. Procesar cada selección
 	for _, selectionID := range input.SelectionIDs {
 		var selection models.PickableSelection
 		// Preload Event para validar fechas
-		if err := tx.Preload("Event").First(&selection, selectionID).Error; err != nil {
+		if err = tx.Preload("Event").First(&selection, selectionID).Error; err != nil {
 			continue // Si una selección no existe, la saltamos o podríamos retornar error
 		}
 
-		// Validar que el evento de la selección pertenezca al torneo actual (seguridad)
+		// Validar que el evento de la selección pertenezca al torneo actual (ahora via TournamentEvent)
 		tournamentIDUint := utils.StringToUint(tournamentID)
-		if selection.Event.TournamentID != tournamentIDUint {
+
+		// Verificar que existe una relación en TournamentEvent para este evento y torneo
+		var tournamentEvent models.TournamentEvent
+		err = tx.Where("event_id = ? AND tournament_id = ?", selection.EventID, tournamentIDUint).First(&tournamentEvent).Error
+		if err != nil {
 			tx.Rollback()
 			utils.Error(c, http.StatusBadRequest, "La selección #"+utils.UintToString(selection.ID)+" no pertenece a este torneo.", nil)
 			return

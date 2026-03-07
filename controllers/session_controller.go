@@ -64,7 +64,7 @@ func CreateSession(c *gin.Context) {
 
 // GetTournamentSessions godoc
 // @Summary      Listar sesiones de un torneo
-// @Description  Obtiene todas las sesiones de un torneo con información de eventos y predicciones
+// @Description  Obtiene todas las sesiones de un torneo con información de eventos
 // @Tags         sessions
 // @Param        id path int true "ID del Torneo"
 // @Produce      json
@@ -74,11 +74,12 @@ func GetTournamentSessions(c *gin.Context) {
 	tournamentID := c.Param("id")
 	var sessions []models.Session
 
-	if err := config.DB.Preload("Events").
+	// Cargar sesiones del torneo (sin preload de Events - ahora via TournamentEvent)
+	if err := config.DB.
 		Where("tournament_id = ?", tournamentID).
 		Order("session_number asc").
 		Find(&sessions).Error; err != nil {
-		utils.Error(c, http.StatusInternalServerError, "Error al obtener sesiones", nil)
+		utils.Error(c, http.StatusInternalServerError, "Error al obtener sesiones", err.Error())
 		return
 	}
 
@@ -87,7 +88,7 @@ func GetTournamentSessions(c *gin.Context) {
 
 // GetSessionByID godoc
 // @Summary      Ver detalle de una sesión
-// @Description  Obtiene los detalles de una sesión específica
+// @Description  Obtiene los detalles de una sesión específica con eventos
 // @Tags         sessions
 // @Param        id path int true "ID de la Sesión"
 // @Produce      json
@@ -97,14 +98,33 @@ func GetSessionByID(c *gin.Context) {
 	sessionID := c.Param("id")
 	var session models.Session
 
-	if err := config.DB.Preload("Events.PickableSelections").
-		Preload("Events.Competitors").
+	// Ahora los eventos están en TournamentEvent, no directamente en Session
+	if err := config.DB.
 		First(&session, sessionID).Error; err != nil {
 		utils.Error(c, http.StatusNotFound, "Sesión no encontrada", nil)
 		return
 	}
 
-	utils.Success(c, http.StatusOK, "Sesión encontrada", session)
+	// Cargar TournamentEvent con los eventos relacionados
+	var tournamentEvents []models.TournamentEvent
+	config.DB.Preload("Event.Competitors").
+		Preload("Event.PickableSelections").
+		Where("session_id = ?", sessionID).
+		Find(&tournamentEvents)
+
+	// Agregar los eventos a la respuesta
+	sessionMap := make(map[string]interface{})
+	sessionMap["id"] = session.ID
+	sessionMap["tournament_id"] = session.TournamentID
+	sessionMap["session_number"] = session.SessionNumber
+	sessionMap["start_time"] = session.StartTime
+	sessionMap["end_time"] = session.EndTime
+	sessionMap["super_line"] = session.SuperLine
+	sessionMap["description"] = session.Description
+	sessionMap["status"] = session.Status
+	sessionMap["tournament_events"] = tournamentEvents
+
+	utils.Success(c, http.StatusOK, "Sesión encontrada", sessionMap)
 }
 
 // UpdateSessionStatus godoc
@@ -245,9 +265,13 @@ func SubmitPicksBySession(c *gin.Context) {
 			continue
 		}
 
-		// Validar que el evento de la selección pertenezca al torneo actual
+		// Validar que el evento de la selección pertenezca al torneo actual (ahora via TournamentEvent)
 		tournamentIDUint := utils.StringToUint(tournamentID)
-		if selection.Event.TournamentID != tournamentIDUint {
+
+		// Verificar que existe una relación en TournamentEvent para este evento y torneo
+		var tournamentEvent models.TournamentEvent
+		err := tx.Where("event_id = ? AND tournament_id = ?", selection.EventID, tournamentIDUint).First(&tournamentEvent).Error
+		if err != nil {
 			tx.Rollback()
 			utils.Error(c, http.StatusBadRequest, "La selección no pertenece a este torneo", nil)
 			return
@@ -262,7 +286,7 @@ func SubmitPicksBySession(c *gin.Context) {
 
 		// Buscar si ya existe un pick para esta selección por este participante en esta sesión
 		var existingPick models.UserPick
-		err := tx.Where("participant_id = ? AND selection_id = ? AND session_id = ?",
+		err = tx.Where("participant_id = ? AND selection_id = ? AND session_id = ?",
 			participant.ID, selection.ID, session.ID).First(&existingPick).Error
 
 		if err == nil {
@@ -319,4 +343,78 @@ func GetSessionPicks(c *gin.Context) {
 	}
 
 	utils.Success(c, http.StatusOK, "Tus predicciones en esta sesión", picks)
+}
+
+// GetSessionEvents godoc
+// @Summary      Obtener eventos de una sesión
+// @Description  Devuelve los eventos de una sesión con sus selecciones
+// @Tags         sessions
+// @Param        id path int true "ID de la Sesión"
+// @Produce      json
+// @Success      200 {object} utils.Response
+// @Router       /session-events/{id}/events [get]
+func GetSessionEvents(c *gin.Context) {
+	sessionID := c.Param("id")
+	var session models.Session
+
+	if err := config.DB.First(&session, sessionID).Error; err != nil {
+		utils.Error(c, http.StatusNotFound, "Sesión no encontrada", nil)
+		return
+	}
+
+	// Cargar TournamentEvent con los eventos y selecciones
+	var tournamentEvents []models.TournamentEvent
+	config.DB.Preload("Event.Competitors").
+		Preload("Event.PickableSelections").
+		Where("session_id = ?", sessionID).
+		Order("order asc").
+		Find(&tournamentEvents)
+
+	// Obtener configuración del torneo para filtrar tipos de selección
+	var tournament models.Tournament
+	tournamentFound := false
+	if err := config.DB.First(&tournament, session.TournamentID).Error; err == nil {
+		tournamentFound = true
+	}
+
+	// Filtrar selecciones según required_selection_types del torneo
+	var filteredEvents []map[string]interface{}
+	for _, te := range tournamentEvents {
+		// Event se cargó con Preload, verificar si tiene datos
+		eventData := map[string]interface{}{
+			"id":         te.EventID,
+			"name":       te.Event.Name,
+			"venue":      te.Event.Venue,
+			"line":       te.Event.Line,
+			"start_time": te.Event.StartTime,
+			"status":     te.Event.Status,
+			"order":      te.Order,
+		}
+
+		// Agregar competidores solo si se cargaron
+		if len(te.Event.Competitors) > 0 {
+			eventData["competitors"] = te.Event.Competitors
+		}
+
+		// Filtrar selecciones si el torneo tiene tipos requeridos
+		var filteredSelections []models.PickableSelection
+		if tournamentFound && len(tournament.Settings.RequiredSelectionTypes) > 0 {
+			requiredTypes := tournament.Settings.RequiredSelectionTypes
+			for _, sel := range te.Event.PickableSelections {
+				for _, reqType := range requiredTypes {
+					if sel.SelectionType == reqType {
+						filteredSelections = append(filteredSelections, sel)
+						break
+					}
+				}
+			}
+			eventData["pickable_selections"] = filteredSelections
+		} else {
+			eventData["pickable_selections"] = te.Event.PickableSelections
+		}
+
+		filteredEvents = append(filteredEvents, eventData)
+	}
+
+	utils.Success(c, http.StatusOK, "Eventos de la sesión", filteredEvents)
 }

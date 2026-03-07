@@ -22,14 +22,18 @@ type Session struct {
 	// Fecha y hora límite de la sesión (hora tope para hacer selecciones, antes de que inicien los partidos)
 	EndTime time.Time `gorm:"not null" json:"end_time"`
 
+	// Super línea para determinar super alta en esta sesión
+	// Ej: 10 goles/carreras - si la suma total es mayor, es Super Alta
+	SuperLine float64 `gorm:"type:decimal(10,2)" json:"super_line"`
+
 	// Descripción opcional de la sesión (ej: "Jornada de Lunes - 5 partidos")
 	Description string `gorm:"size:255" json:"description"`
 
 	// Estado de la sesión: open (abierta para picks), closed (cerrada), settled (liquidada)
 	Status string `gorm:"size:20;default:'open';index" json:"status"`
 
-	// Relaciones
-	Events []Event `gorm:"foreignKey:SessionID" json:"events,omitempty"`
+	// Relaciones - los eventos de una sesión se gestionan a través de TournamentEvent
+	// Events []Event `gorm:"foreignKey:SessionID" json:"events,omitempty"` // Ahora via TournamentEvent
 }
 
 // Hook BeforeSave para validaciones

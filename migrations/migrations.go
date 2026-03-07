@@ -21,10 +21,16 @@ func RunMigrations(db *gorm.DB) {
 		&models.EventCompetitor{},
 		&models.Tournament{},
 		&models.TournamentParticipant{},
+		&models.TournamentEvent{}, // Tabla intermedia para eventos reutilizables
 		&models.UserPick{},
 		&models.PickableSelection{},
 		&models.Session{},
 		&models.UserPaymentMethod{},
+		&models.Category{},
+		&models.CategorySelectionType{},
+		&models.CategorySettingsJSON{},
+		&models.Competitor{}, // Catálogo global de competidores
+		&models.Withdrawal{}, // Retiros
 	)
 
 	if err != nil {
@@ -33,7 +39,7 @@ func RunMigrations(db *gorm.DB) {
 
 	// Crear usuario administrador inicial si no existe
 	var admin models.User
-	if err := db.Where("email = ?", "admin@betsystem.com").First(&admin).Error; err != nil {
+	if err := db.Where("email = ?", "admin@admin.com").First(&admin).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Crear admin
 			hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("Admin123!"), 14)

@@ -77,10 +77,16 @@ func CreateTournament(c *gin.Context) {
 // @Produce      json
 // @Success      200 {object} utils.Response{data=[]models.Tournament} "Lista de torneos"
 // @Router       /tournaments [get]
+// @Failure		 404 {object} utils.Response "No hay torneos disponibles"
 // @example response -json {"success": true, "message": "Lista de torneos", "data": [{"id": 1, "name": "Quiniela Semanal", "category": "Futbol", "status": "open", "entry_fee": 10.00}]}
 func GetTournaments(c *gin.Context) {
 	var tournaments []models.Tournament
 	config.DB.Find(&tournaments)
+	// Devolver siempre 200 con array vacío si no hay torneos (más consistente con REST)
+	if tournaments == nil {
+		tournaments = []models.Tournament{}
+	}
+
 	utils.Success(c, http.StatusOK, "Lista de torneos", tournaments)
 }
 
@@ -234,18 +240,53 @@ func GetTournamentBySlug(c *gin.Context) {
 // @Router       /tournaments/{id}/events [get]
 func GetTournamentEvents(c *gin.Context) {
 	id := c.Param("id")
-	var events []models.Event
+	var tournamentEvents []models.TournamentEvent
 
-	// Preload de Competitors y PickableSelections es vital para mostrar la "Cartilla" completa
-	if err := config.DB.Preload("Competitors").Preload("PickableSelections").
+	// Obtener los eventos del torneo a través de la tabla TournamentEvent
+	if err := config.DB.
+		Preload("Event").
+		Preload("Event.Competitors").
+		Preload("Event.PickableSelections").
+		Preload("Session").
 		Where("tournament_id = ?", id).
-		Order("start_time asc").
-		Find(&events).Error; err != nil {
+		Order("tournament_events.order asc").
+		Find(&tournamentEvents).Error; err != nil {
 		utils.Error(c, http.StatusInternalServerError, "Error al obtener eventos", nil)
 		return
 	}
 
-	utils.Success(c, http.StatusOK, "Eventos y selecciones del torneo", events)
+	// Crear respuesta enrichida con información de la sesión
+	response := make([]map[string]interface{}, len(tournamentEvents))
+	for i, te := range tournamentEvents {
+		eventMap := map[string]interface{}{
+			"id":                  te.Event.ID,
+			"name":                te.Event.Name,
+			"venue":               te.Event.Venue,
+			"line":                te.Event.Line,
+			"start_time":          te.Event.StartTime,
+			"status":              te.Event.Status,
+			"order":               te.Order,
+			"tournament_id":       te.TournamentID,
+			"event_id":            te.EventID,
+			"competitors":         te.Event.Competitors,
+			"pickable_selections": te.Event.PickableSelections,
+		}
+
+		// Agregar información de la sesión si existe
+		if te.SessionID != nil && te.Session.ID != 0 {
+			eventMap["session"] = map[string]interface{}{
+				"id":             te.Session.ID,
+				"session_number": te.Session.SessionNumber,
+				"start_time":     te.Session.StartTime,
+				"end_time":       te.Session.EndTime,
+				"status":         te.Session.Status,
+			}
+		}
+
+		response[i] = eventMap
+	}
+
+	utils.Success(c, http.StatusOK, "Eventos y selecciones del torneo", response)
 }
 
 /*
@@ -269,5 +310,48 @@ func GetTournamentSessions(c *gin.Context) {
 	utils.Success(c, http.StatusOK, "Sesiones del torneo", sessions)
 }
 */
+
+// GetMyTournaments godoc
+// @Summary      Listar torneos del usuario
+// @Description  Obtiene los torneos en los que el usuario está inscrito
+// @Tags         tournaments
+// @Produce      json
+// @Success      200 {object} utils.Response{data=[]models.Tournament}
+// @Router       /my-tournaments [get]
+// @Security     BearerAuth
+func GetMyTournaments(c *gin.Context) {
+	// Obtener ID del usuario del contexto (del middleware de auth)
+	userID, exists := c.Get("userID")
+	if !exists {
+		utils.Error(c, http.StatusUnauthorized, "Usuario no autenticado", nil)
+		return
+	}
+
+	// Obtener IDs de torneos donde participa el usuario
+	var participantIDs []uint
+	if err := config.DB.Model(&models.TournamentParticipant{}).
+		Where("user_id = ?", userID).
+		Pluck("tournament_id", &participantIDs).Error; err != nil {
+		utils.Error(c, http.StatusInternalServerError, "Error al obtener torneos", err.Error())
+		return
+	}
+
+	if len(participantIDs) == 0 {
+		utils.Success(c, http.StatusOK, "No estás inscrito en ningún torneo", []models.Tournament{})
+		return
+	}
+
+	// Obtener los torneos
+	var tournaments []models.Tournament
+	if err := config.DB.
+		Where("id IN ?", participantIDs).
+		Preload("Participants", "user_id = ?", userID).
+		Find(&tournaments).Error; err != nil {
+		utils.Error(c, http.StatusInternalServerError, "Error al obtener torneos", err.Error())
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "Tus torneos", tournaments)
+}
 
 // GetTournamentLeaderboard ya está definido en leaderboard_controller.go
