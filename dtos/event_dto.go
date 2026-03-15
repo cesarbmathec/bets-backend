@@ -4,19 +4,21 @@ import "time"
 
 // CreateEventRequest - Crear un evento global (sin asignar a torneo)
 type CreateEventRequest struct {
-	Name      string  `json:"name" binding:"required" example:"Barcelona vs Real Madrid"`
-	Venue     string  `json:"venue" example:"Camp Nou"`
-	Line      float64 `json:"line" example:2.5`
-	StartTime string  `json:"start_time" binding:"required" example:"2026-02-28T15:00:00Z"`
+	CategoryID *uint   `json:"category_id"`
+	Name       string  `json:"name" binding:"required" example:"Barcelona vs Real Madrid"`
+	Venue      string  `json:"venue" example:"Camp Nou"`
+	Line       float64 `json:"line" example:2.5`
+	StartTime  string  `json:"start_time" binding:"required" example:"2026-02-28T15:00:00Z"`
 }
 
 // UpdateEventRequest - Actualizar un evento
 type UpdateEventRequest struct {
-	Name      string  `json:"name"`
-	Venue     string  `json:"venue"`
-	Line      float64 `json:"line"`
-	StartTime string  `json:"start_time"`
-	Status    string  `json:"status"`
+	CategoryID *uint   `json:"category_id"`
+	Name       string  `json:"name"`
+	Venue      string  `json:"venue"`
+	Line       float64 `json:"line"`
+	StartTime  string  `json:"start_time"`
+	Status     string  `json:"status"`
 }
 
 // AssignEventToTournamentRequest - Asignar un evento a un torneo
@@ -62,17 +64,27 @@ type SettleResult struct {
 
 // TournamentEventResponse - Evento asignado a un torneo
 type TournamentEventResponse struct {
-	ID           uint          `json:"id"`
-	EventID      uint          `json:"event_id"`
-	TournamentID uint          `json:"tournament_id"`
-	SessionID    *uint         `json:"session_id,omitempty"`
-	Order        int           `json:"order"`
-	Event        EventResponse `json:"event"`
+	ID           uint           `json:"id"`
+	EventID      uint           `json:"event_id"`
+	TournamentID uint           `json:"tournament_id"`
+	SessionID    *uint          `json:"session_id,omitempty"`
+	Order        int            `json:"order"`
+	Event        EventResponse  `json:"event"`
+	Tournament   TournamentInfo `json:"tournament"`
+	Session      string         `json:"session"`
+}
+
+// TournamentInfo - Información básica del torneo
+type TournamentInfo struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
 }
 
 // EventResponse - Respuesta de evento
 type EventResponse struct {
 	ID          uint                      `json:"id"`
+	CategoryID  *uint                     `json:"category_id"`
 	Name        string                    `json:"name"`
 	Slug        string                    `json:"slug"`
 	Venue       string                    `json:"venue"`
@@ -83,6 +95,24 @@ type EventResponse struct {
 	TotalScore  float64                   `json:"total_score"`
 	Competitors []EventCompetitorResponse `json:"competitors,omitempty"`
 }
+
+// EventWithTournamentsResponse - Respuesta de evento con TournamentEvents
+type EventWithTournamentsResponse struct {
+	ID               uint                      `json:"id"`
+	CategoryID       *uint                     `json:"category_id"`
+	Name             string                    `json:"name"`
+	Slug             string                    `json:"slug"`
+	Venue            string                    `json:"venue"`
+	Line             float64                   `json:"line"`
+	StartTime        time.Time                 `json:"start_time"`
+	Status           string                    `json:"status"`
+	ResultNote       string                    `json:"result_note,omitempty"`
+	TotalScore       float64                   `json:"total_score"`
+	Competitors      []EventCompetitorResponse `json:"competitors,omitempty"`
+	TournamentEvents []TournamentEventResponse `json:"tournament_events,omitempty"`
+}
+
+// TournamentEventResponse - Evento asignado a un torneo con detalles
 
 // EventCompetitorResponse - Respuesta de competidor en evento
 type EventCompetitorResponse struct {

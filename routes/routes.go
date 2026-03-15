@@ -161,8 +161,10 @@ func SetupRouter() *gin.Engine {
 				userRoutes.POST("/tournaments/:id/sessions/picks", controllers.SubmitPicksBySession)
 
 				// Billetera
+				userRoutes.GET("/wallet", controllers.GetBalance)
 				userRoutes.GET("/wallet/balance", controllers.GetBalance)
 				userRoutes.POST("/wallet/deposit", controllers.DepositMoney)
+				userRoutes.GET("/wallet/transactions", controllers.GetTransactionHistory)
 				userRoutes.GET("/wallet/history", controllers.GetTransactionHistory)
 				userRoutes.GET("/wallet/statistics", controllers.GetUserStatistics)
 

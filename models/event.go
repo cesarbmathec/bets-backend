@@ -8,12 +8,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// Event representa un evento/deporte/partido global que puede ser asignado a diferentes torneos.
+// Event representa un evento/deporte/partido global que puede ser asignado a diferentes toros.
 // Los eventos son independientes de los torneos y se relacionan a través de la tabla TournamentEvent.
 type Event struct {
 	BaseModel
 	// NO tiene TournamentID directo - la relación es a través de TournamentEvent
 	// NO tiene SessionID directo - la relación es a través de TournamentEvent
+
+	// Categoría del evento (Fútbol, Béisbol, Carreras de Caballos, etc.)
+	CategoryID *uint     `gorm:"index" json:"category_id"`
+	Category   *Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 
 	Name      string    `gorm:"size:200;not null" json:"name" binding:"required"`
 	Slug      string    `gorm:"size:220;uniqueIndex;not null" json:"slug"`
@@ -39,6 +43,7 @@ type Event struct {
 	// Relaciones
 	Competitors        []EventCompetitor   `gorm:"foreignKey:EventID" json:"competitors"`
 	PickableSelections []PickableSelection `gorm:"foreignKey:EventID" json:"pickable_selections,omitempty"`
+	TournamentEvents   []TournamentEvent   `gorm:"foreignKey:EventID" json:"tournament_events,omitempty"`
 }
 
 // TournamentEvent define la relación muchos a muchos entre Tournament y Event.

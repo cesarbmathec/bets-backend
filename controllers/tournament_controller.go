@@ -247,6 +247,7 @@ func GetTournamentEvents(c *gin.Context) {
 		Preload("Event").
 		Preload("Event.Competitors").
 		Preload("Event.PickableSelections").
+		Preload("Event.Category").
 		Preload("Session").
 		Where("tournament_id = ?", id).
 		Order("tournament_events.order asc").
@@ -260,6 +261,7 @@ func GetTournamentEvents(c *gin.Context) {
 	for i, te := range tournamentEvents {
 		eventMap := map[string]interface{}{
 			"id":                  te.Event.ID,
+			"category_id":         te.Event.CategoryID,
 			"name":                te.Event.Name,
 			"venue":               te.Event.Venue,
 			"line":                te.Event.Line,
@@ -268,6 +270,7 @@ func GetTournamentEvents(c *gin.Context) {
 			"order":               te.Order,
 			"tournament_id":       te.TournamentID,
 			"event_id":            te.EventID,
+			"session_id":          te.SessionID, // Agregar session_id para facilitar filtrado en frontend
 			"competitors":         te.Event.Competitors,
 			"pickable_selections": te.Event.PickableSelections,
 		}

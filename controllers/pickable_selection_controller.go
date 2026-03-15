@@ -36,13 +36,33 @@ func CreateSelection(c *gin.Context) {
 		return
 	}
 
+	// Obtener los puntos del Tournament si no se especifican
+	pointsForWin := input.PointsForWin
+
+	// Si no se especifican puntos (es 0), intentar heredarlos del Tournament
+	if pointsForWin == 0 {
+		// Buscar el tournament al que pertenece este evento
+		var tournamentEvent models.TournamentEvent
+		if err := config.DB.Where("event_id = ?", input.EventID).First(&tournamentEvent).Error; err == nil {
+			// Obtener el tournament
+			var tournament models.Tournament
+			if err := config.DB.First(&tournament, tournamentEvent.TournamentID).Error; err == nil {
+				// Obtener los puntos del tipo de selección
+				pointsMap := tournament.Settings.PointsBySelectionType
+				if pts, ok := pointsMap[input.SelectionType]; ok {
+					pointsForWin = pts
+				}
+			}
+		}
+	}
+
 	selection := models.PickableSelection{
 		EventID:       input.EventID,
 		Description:   input.Description,
 		SelectionType: input.SelectionType,
 		Line:          input.Line,
 		CompetitorID:  input.CompetitorID,
-		PointsForWin:  input.PointsForWin,
+		PointsForWin:  pointsForWin,
 		PointsForPush: input.PointsForPush,
 		Status:        "pending",
 	}

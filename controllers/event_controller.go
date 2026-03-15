@@ -27,7 +27,7 @@ import (
 // @Router       /events [get]
 func GetGlobalEvents(c *gin.Context) {
 	var events []models.Event
-	query := config.DB // Todos los eventos son globales ahora (sin TournamentID directo)
+	query := config.DB
 
 	// Buscar por nombre
 	search := c.Query("search")
@@ -41,12 +41,53 @@ func GetGlobalEvents(c *gin.Context) {
 		query = query.Where("status = ?", status)
 	}
 
-	if err := query.Order("start_time asc").Preload("Competitors").Find(&events).Error; err != nil {
+	if err := query.Order("start_time asc").Preload("Competitors").Preload("Category").Preload("TournamentEvents.Tournament").Preload("TournamentEvents.Session").Find(&events).Error; err != nil {
 		utils.Error(c, http.StatusInternalServerError, "Error al obtener eventos", err.Error())
 		return
 	}
 
-	utils.Success(c, http.StatusOK, "Eventos obtenidos", events)
+	// Convertir a respuesta con TournamentEvents
+	response := make([]dtos.EventWithTournamentsResponse, len(events))
+	for i, event := range events {
+		// Convertir TournamentEvents
+		tournamentEvents := make([]dtos.TournamentEventResponse, len(event.TournamentEvents))
+		for j, te := range event.TournamentEvents {
+			var sessionInfo string
+			if te.SessionID != nil && te.Session.ID > 0 {
+				sessionInfo = "Sesión " + fmt.Sprint(te.Session.SessionNumber)
+			}
+			tournamentEvents[j] = dtos.TournamentEventResponse{
+				ID:           te.ID,
+				EventID:      te.EventID,
+				TournamentID: te.TournamentID,
+				SessionID:    te.SessionID,
+				Order:        te.Order,
+				Tournament: dtos.TournamentInfo{
+					ID:   te.Tournament.ID,
+					Name: te.Tournament.Name,
+					Slug: te.Tournament.Slug,
+				},
+				Session: sessionInfo,
+			}
+		}
+
+		response[i] = dtos.EventWithTournamentsResponse{
+			ID:               event.ID,
+			CategoryID:       event.CategoryID,
+			Name:             event.Name,
+			Slug:             event.Slug,
+			Venue:            event.Venue,
+			Line:             event.Line,
+			StartTime:        event.StartTime,
+			Status:           event.Status,
+			ResultNote:       event.ResultNote,
+			TotalScore:       event.TotalScore,
+			TournamentEvents: tournamentEvents,
+			Competitors:      convertToEventCompetitorResponse(event.Competitors),
+		}
+	}
+
+	utils.Success(c, http.StatusOK, "Eventos obtenidos", response)
 }
 
 // GetEventByID godoc
@@ -60,7 +101,7 @@ func GetEventByID(c *gin.Context) {
 	id := c.Param("id")
 	var event models.Event
 
-	if err := config.DB.Preload("Competitors").First(&event, id).Error; err != nil {
+	if err := config.DB.Preload("Competitors").Preload("Category").First(&event, id).Error; err != nil {
 		utils.Error(c, http.StatusNotFound, "Evento no encontrado", nil)
 		return
 	}
@@ -82,6 +123,7 @@ func GetTournamentEventsByTournament(c *gin.Context) {
 	var tournamentEvents []models.TournamentEvent
 	if err := config.DB.
 		Preload("Event.Competitors").
+		Preload("Event.Category").
 		Preload("Session").
 		Where("tournament_id = ?", tournamentID).
 		Order("session_id asc, \"order\" asc").
@@ -122,11 +164,12 @@ func CreateGlobalEvent(c *gin.Context) {
 	}
 
 	event := models.Event{
-		Name:      input.Name,
-		Venue:     input.Venue,
-		Line:      input.Line,
-		StartTime: startTime,
-		Status:    "scheduled",
+		CategoryID: input.CategoryID,
+		Name:       input.Name,
+		Venue:      input.Venue,
+		Line:       input.Line,
+		StartTime:  startTime,
+		Status:     "scheduled",
 		// TournamentID queda NULL - es un evento global
 	}
 
@@ -137,7 +180,7 @@ func CreateGlobalEvent(c *gin.Context) {
 
 	fmt.Printf("Event created with ID: %d\n", event.ID)
 
-	config.DB.Preload("Competitors").First(&event, event.ID)
+	config.DB.Preload("Competitors").Preload("Category").First(&event, event.ID)
 	utils.Success(c, http.StatusCreated, "Evento creado con éxito", event)
 }
 
@@ -168,6 +211,9 @@ func UpdateEvent(c *gin.Context) {
 	}
 
 	// Actualizar campos
+	if input.CategoryID != nil {
+		event.CategoryID = input.CategoryID
+	}
 	if input.Name != "" {
 		event.Name = input.Name
 	}
@@ -192,7 +238,7 @@ func UpdateEvent(c *gin.Context) {
 		return
 	}
 
-	config.DB.Preload("Competitors").First(&event, event.ID)
+	config.DB.Preload("Competitors").Preload("Category").First(&event, event.ID)
 	utils.Success(c, http.StatusOK, "Evento actualizado", event)
 }
 
@@ -416,4 +462,25 @@ func GetAvailableEventsForTournament(c *gin.Context) {
 	}
 
 	utils.Success(c, http.StatusOK, "Eventos disponibles", events)
+}
+
+// convertToEventCompetitorResponse convierte modelos EventCompetitor a DTOs
+func convertToEventCompetitorResponse(competitors []models.EventCompetitor) []dtos.EventCompetitorResponse {
+	result := make([]dtos.EventCompetitorResponse, len(competitors))
+	for i, c := range competitors {
+		result[i] = dtos.EventCompetitorResponse{
+			ID:             c.ID,
+			CompetitorID:   c.CompetitorID,
+			Name:           c.Name,
+			AssignedNumber: c.AssignedNumber,
+			Odds:           c.Odds,
+			Runline:        int(c.Runline),
+			SuperRunline:   int(c.SuperRunline),
+			IsFavorite:     c.IsFavorite,
+			FinalScore:     c.FinalScore,
+			Position:       c.Position,
+			IsScratched:    c.IsScratched,
+		}
+	}
+	return result
 }
